@@ -1,30 +1,17 @@
 # syntax=docker/dockerfile:1
 FROM julia:1.7.2
 WORKDIR /root/build
+
 COPY *.jl ./
-
-# Install and build julia packages
-RUN julia install_pkgs.jl
-
-# Hack in the new jupyter kernel
-RUN mkdir /root/.local/share/jupyter/kernels/julia-FNC
-COPY julia-FNC/* /root/.local/share/jupyter/kernels/julia-FNC/
-RUN julia install_kernel.jl
 
 # install gcc to build sysimage
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get -y install g++
 
+# Install and build julia packages
 RUN julia make_image.jl
 
+# This causes MKL to be downloaded into the image.
 RUN julia -Jjulia_fast.so -e "using FundamentalsNumericalComputation"
 
-# disable tokens
-COPY jupyter_lab_config.py /root/.jupyter/jupyter_lab_config.py
-
-RUN mkdir /FNC
-VOLUME /FNC
-
-WORKDIR /FNC
-CMD ["/root/.julia/conda/3/bin/jupyter-lab","--port=8899","--ip=0.0.0.0","--no-browser","--allow-root"]
-EXPOSE 8899
+CMD julia -i --project=@. -J/root/build/julia_fast.so --color=yes /root/.julia/packages/IJulia/$(ls /root/.julia/packages/IJulia/)/src/kernel.jl $DOCKERNEL_CONNECTION_FILE
